@@ -3,6 +3,7 @@ import { LocalPostgres } from '../src/postgres.js';
 import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { homedir } from 'node:os';
 import { createServer } from 'node:net';
 import { Client } from 'pg';
 import { createDb, type Db } from '../src/db.js';
@@ -51,11 +52,12 @@ beforeAll(async () => {
       'TEST_DATABASE_URL must point to a dedicated database ending in _test; tests truncate its tables.',
     );
   if (!url) {
-    const root = resolve(
-      fileURLToPath(new URL('../../../', import.meta.url)),
-      'work',
-      'test-databases',
-    );
+    // PostgreSQL drops administrator privileges on Windows. The hosted runner's
+    // workspace is owned by the Administrators group, so use its user-owned temp folder.
+    const root =
+      process.platform === 'win32' && process.env.CI
+        ? resolve(homedir(), 'AppData', 'Local', 'Temp', 'shopflow-tests')
+        : resolve(fileURLToPath(new URL('../../../', import.meta.url)), 'work', 'test-databases');
     await mkdir(root, { recursive: true });
     const directory = resolve(await mkdtemp(resolve(root, 'postgres-')));
     if (!directory.startsWith(root + sep)) throw new Error('Invalid temporary database path');
