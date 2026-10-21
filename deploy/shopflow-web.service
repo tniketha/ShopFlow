@@ -1,0 +1,21 @@
+[Unit]
+Description=ShopFlow web
+After=network-online.target shopflow-api.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=shopflow
+WorkingDirectory=/srv/shopflow
+EnvironmentFile=/srv/shopflow/.env
+ExecStart=/usr/bin/npm run start -w @shopflow/web
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/shopflow/apps/web/.next
+
+[Install]
+WantedBy=multi-user.target

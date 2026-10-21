@@ -1,0 +1,7 @@
+node_modules/
+work/
+**/.next/
+**/dist/
+apps/api/src/generated/
+package-lock.json
+apps/web/next-env.d.ts

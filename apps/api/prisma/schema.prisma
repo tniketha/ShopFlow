@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client"
+  output = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+datasource db {
+  provider = "postgresql"
+}
+enum Role {
+  OWNER
+  MANAGER
+  CASHIER
+}
+model Business {
+  id String @id @default(uuid())
+  name String
+  createdAt DateTime @default(now())
+  users User[]
+  categories Category[]
+  suppliers Supplier[]
+  products Product[]
+  purchases Purchase[]
+  purchaseLines PurchaseLine[]
+  sales Sale[]
+  saleLines SaleLine[]
+  refunds Refund[]
+  refundLines RefundLine[]
+  movements StockMovement[]
+  audit Audit[]
+}
+model User {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  email String @unique
+  name String
+  passwordHash String
+  role Role
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  sessions Session[]
+  @@unique([businessId, id])
+}
+model Session {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  csrf String
+  expiresAt DateTime
+  @@index([expiresAt])
+}
+model Category {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  name String
+  products Product[]
+  @@unique([businessId, id])
+  @@unique([businessId, name])
+}
+model Supplier {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  name String
+  contact String?
+  purchases Purchase[]
+  @@unique([businessId, id])
+}
+model Product {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  sku String
+  name String
+  priceMinor Int
+  costMinor Int
+  stock Int @default(0)
+  reorderLevel Int @default(5)
+  active Boolean @default(true)
+  categoryId String?
+  category Category? @relation(fields: [businessId, categoryId], references: [businessId, id])
+  lines SaleLine[]
+  movements StockMovement[]
+  purchaseLines PurchaseLine[]
+  @@unique([businessId, id])
+  @@unique([businessId, sku])
+  @@index([businessId, active])
+}
+model Purchase {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  supplierId String
+  supplier Supplier @relation(fields: [businessId, supplierId], references: [businessId, id])
+  requestKey String
+  requestHash String
+  totalMinor Int
+  createdAt DateTime @default(now())
+  lines PurchaseLine[]
+  @@unique([businessId, id])
+  @@unique([businessId, requestKey])
+}
+model PurchaseLine {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  purchaseId String
+  purchase Purchase @relation(fields: [businessId, purchaseId], references: [businessId, id])
+  productId String
+  product Product @relation(fields: [businessId, productId], references: [businessId, id])
+  quantity Int
+  costMinor Int
+}
+model Sale {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  invoiceNo Int @unique @default(autoincrement())
+  requestKey String
+  requestHash String
+  cashierId String
+  totalMinor Int
+  paidMinor Int
+  createdAt DateTime @default(now())
+  lines SaleLine[]
+  refunds Refund[]
+  @@unique([businessId, id])
+  @@unique([businessId, requestKey])
+  @@index([businessId, createdAt])
+}
+model SaleLine {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  saleId String
+  sale Sale @relation(fields: [businessId, saleId], references: [businessId, id])
+  productId String
+  product Product @relation(fields: [businessId, productId], references: [businessId, id])
+  sku String
+  name String
+  quantity Int
+  returnedQuantity Int @default(0)
+  priceMinor Int
+  costMinor Int
+  refunds RefundLine[]
+  @@unique([businessId, id])
+}
+model Refund {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  saleId String
+  sale Sale @relation(fields: [businessId, saleId], references: [businessId, id])
+  requestKey String
+  requestHash String
+  reason String
+  actorId String
+  totalMinor Int
+  createdAt DateTime @default(now())
+  lines RefundLine[]
+  @@unique([businessId, id])
+  @@unique([businessId, requestKey])
+  @@index([businessId, createdAt])
+}
+model RefundLine {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  refundId String
+  refund Refund @relation(fields: [businessId, refundId], references: [businessId, id])
+  saleLineId String
+  saleLine SaleLine @relation(fields: [businessId, saleLineId], references: [businessId, id])
+  quantity Int
+  priceMinor Int
+}
+model StockMovement {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  productId String
+  product Product @relation(fields: [businessId, productId], references: [businessId, id])
+  delta Int
+  kind String
+  referenceId String
+  actorId String
+  createdAt DateTime @default(now())
+  @@index([businessId, createdAt])
+}
+model Audit {
+  id String @id @default(uuid())
+  businessId String
+  business Business @relation(fields: [businessId], references: [id])
+  actorId String
+  action String
+  entityId String
+  createdAt DateTime @default(now())
+  @@index([businessId, createdAt])
+}

@@ -1,0 +1,30 @@
+name: Deploy ShopFlow
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: shopflow-production
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-fund
+      - run: npm run db:generate
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm run build
+      - name: Trigger configured hosting deploy hook
+        env:
+          DEPLOY_HOOK_URL: ${{ secrets.DEPLOY_HOOK_URL }}
+        run: |
+          test -n "$DEPLOY_HOOK_URL" || { echo 'Configure the production DEPLOY_HOOK_URL secret first.'; exit 1; }
+          curl --fail --silent --show-error --request POST "$DEPLOY_HOOK_URL"

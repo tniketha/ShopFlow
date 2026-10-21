@@ -1,0 +1,33 @@
+{
+  "name": "shopflow",
+  "private": true,
+  "version": "1.0.0",
+  "author": "tniketha",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "engines": {
+    "node": ">=22.14.0 <25"
+  },
+  "scripts": {
+    "dev": "concurrently -n api,web -c cyan,magenta \"npm run dev -w @shopflow/api\" \"npm run dev -w @shopflow/web\"",
+    "build": "npm run build -w @shopflow/api && npm run build -w @shopflow/web",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test -w @shopflow/api",
+    "test:integration": "npm run test:integration -w @shopflow/api",
+    "db:generate": "npm run db:generate -w @shopflow/api",
+    "db:migrate": "npm run db:migrate -w @shopflow/api",
+    "db:dev": "npm exec -w @shopflow/api -- prisma migrate dev",
+    "owner:create": "npm run owner:create -w @shopflow/api",
+    "local:db": "tsx apps/api/src/local.ts db",
+    "local:setup": "tsx apps/api/src/local.ts setup",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md,yml,yaml}\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3"
+  }
+}

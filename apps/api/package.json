@@ -1,0 +1,40 @@
+{
+  "name": "@shopflow/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "author": "tniketha",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "start": "node --env-file=../../.env dist/server.js",
+    "test": "vitest run test/unit.test.ts",
+    "test:integration": "vitest run test/integration.test.ts --maxWorkers=1",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:dev": "prisma migrate dev",
+    "owner:create": "tsx --env-file=../../.env src/create-owner.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/rate-limit": "^10.3.0",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "dotenv": "^17.2.3",
+    "fastify": "5.12.7",
+    "pdfkit": "^0.17.2",
+    "pg": "^8.16.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "@types/pdfkit": "^0.17.4",
+    "@types/pg": "^8.15.6",
+    "embedded-postgres": "18.4.0-beta.17",
+    "prisma": "7.10.1",
+    "tsx": "^4.21.0",
+    "vitest": "^4.0.18"
+  }
+}
