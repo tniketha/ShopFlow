@@ -2,6 +2,10 @@
 
 A store workspace for inventory, purchasing and cash checkout. Author and project owner: **tniketha**.
 
+![ShopFlow store dashboard](docs/screenshots/01-dashboard-desktop.jpg)
+
+Explore the [desktop and mobile screenshot gallery](docs/screenshots/README.md). Images show fictional sample store data. See the [portfolio notes](docs/PORTFOLIO.md) for suggested images and a short project description.
+
 ShopFlow uses TypeScript, Next.js 16 App Router, React 19, Tailwind CSS 4, Fastify 5, PostgreSQL and Prisma 7.10.1 with the PostgreSQL driver adapter. Dependency versions are recorded in `package-lock.json`. Prisma 7.10.1 is pinned as the stable release; the registry's Prisma 8 tag was a release candidate when this project was created.
 
 ## Start on Windows
@@ -100,7 +104,7 @@ npm run test:integration
 npm run build
 ```
 
-Integration tests start an isolated **real PostgreSQL** instance, apply the SQL migrations, test the API and concurrent transactions, and shut it down. They do not use your store database. An optional `TEST_DATABASE_URL` must target a dedicated empty database ending in `_test`; tests truncate that database. Tests create temporary files under `work/test-databases`.
+Integration tests start an isolated **real PostgreSQL** instance, apply the SQL migrations, test the API and concurrent transactions, and shut it down. They do not use your store database. An optional `TEST_DATABASE_URL` must target a dedicated empty database ending in `_test`; tests truncate that database. Local tests create temporary files under `work/test-databases`; hosted Windows CI uses the runner's user-owned temporary folder so PostgreSQL can run with reduced privileges.
 
 For schema changes, run `npm run db:dev -- --name your_change` against a development database. Review the generated migration and retain the hand-written CHECK constraints. Production and existing installations use `npm run db:migrate`, which runs `prisma migrate deploy` without resetting data. Regenerate the client after changing the schema.
 

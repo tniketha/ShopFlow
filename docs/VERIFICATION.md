@@ -14,4 +14,4 @@ The implementation was checked locally on Windows with Node.js 22.14.0.
 
 The preview's temporary accounts, credentials and database are excluded from the source distribution and the independent Desktop app copy. Run Setup.cmd to create your own store and owner.
 
-The repository contains CI and deployment configuration. Local verification does not assert a completed hosted workflow or live deployment. PDF generation and export format checks passed; non-Latin font coverage and real-shop acceptance remain operational checks documented in README.md.
+GitHub CI passed on both Windows and Linux after placing the Windows runner's test database in its user-owned temporary directory. See the repository's Actions tab for the latest commit's status. The repository contains deployment configuration, but live hosting is not provisioned. PDF generation and export format checks passed; non-Latin font coverage and real-shop acceptance remain operational checks documented in README.md.
