@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdir, writeFile, unlink } from 'node:fs/promises';
+import { mkdir, writeFile, unlink, open, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
@@ -14,31 +14,46 @@ export class LocalPostgres {
     return import(`@embedded-postgres/${platform}-${process.arch}`);
   }
   private async run(binary: string, args: string[]) {
-    await new Promise<void>((done, reject) => {
-      const child = spawn(binary, args, {
-        windowsHide: true,
-        stdio: 'ignore',
-        env: { ...process.env, LC_MESSAGES: 'C' },
+    const logPath = resolve(dirname(this.options.databaseDir), 'postgres-commands.log');
+    const log = await open(logPath, 'a');
+    try {
+      await new Promise<void>((done, reject) => {
+        const child = spawn(binary, args, {
+          windowsHide: true,
+          // File descriptors avoid inherited pipe handles keeping Windows launchers open.
+          stdio: ['ignore', log.fd, log.fd],
+          env: { ...process.env, LC_MESSAGES: 'C' },
+        });
+        const timeout = setTimeout(() => {
+          child.kill();
+          reject(new Error('PostgreSQL command timed out. Check work/postgres.log.'));
+        }, 60000);
+        child.on('error', (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+        child.on('exit', (code) => {
+          clearTimeout(timeout);
+          code === 0
+            ? done()
+            : reject(
+                new Error(
+                  `PostgreSQL command failed (${code}). Check work/postgres.log and whether the port is already in use.`,
+                ),
+              );
+        });
       });
-      const timeout = setTimeout(() => {
-        child.kill();
-        reject(new Error('PostgreSQL command timed out. Check work/postgres.log.'));
-      }, 60000);
-      child.on('error', (error) => {
-        clearTimeout(timeout);
-        reject(error);
-      });
-      child.on('exit', (code) => {
-        clearTimeout(timeout);
-        code === 0
-          ? done()
-          : reject(
-              new Error(
-                `PostgreSQL command failed (${code}). Check work/postgres.log and whether the port is already in use.`,
-              ),
-            );
-      });
-    });
+    } catch (error) {
+      const details = (await readFile(logPath, 'utf8').catch(() => '')).slice(-6000);
+      const server = (
+        await readFile(resolve(dirname(this.options.databaseDir), 'postgres.log'), 'utf8').catch(
+          () => '',
+        )
+      ).slice(-3000);
+      throw new Error(`${(error as Error).message}\n${details}\n${server}`);
+    } finally {
+      await log.close();
+    }
   }
   async initialise() {
     const { initdb } = await this.binaries();
