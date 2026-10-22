@@ -151,19 +151,18 @@ small {
   gap: 9px;
 }
 .brand-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--green);
+  display: block;
   border-radius: 10px;
-  color: #fff;
-  width: 34px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   flex-shrink: 0;
 }
-.brand-dot {
-  color: #8caa69;
-  margin-left: -7px;
+.brand-name > span:last-child {
+  color: #557543;
+}
+.sidebar .brand-name > span:last-child,
+.login-story .brand-name > span:last-child {
+  color: var(--accent);
 }
 .app-shell {
   display: flex;
@@ -183,13 +182,6 @@ small {
 }
 .sidebar > .brand {
   margin-left: 8px;
-}
-.sidebar .brand-icon {
-  background: var(--accent);
-  color: var(--forest);
-}
-.sidebar .brand-dot {
-  color: var(--accent);
 }
 .store-card {
   display: flex;
@@ -1214,10 +1206,6 @@ textarea {
 .login-story .brand {
   font-size: 26px;
 }
-.login-story .brand-icon {
-  background: var(--accent);
-  color: var(--forest);
-}
 .login-story .eyebrow {
   color: #dbe8b8;
 }
@@ -1393,7 +1381,6 @@ textarea {
     font-size: 0;
     margin: 0 7px;
   }
-  .brand-dot,
   .store-card,
   .nav-label,
   .sidebar nav a .nav-key,

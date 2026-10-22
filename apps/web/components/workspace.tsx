@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ProductPhoto, PhotoPicker } from './product-photo';
+import { BrandMark, BrandName } from './brand';
 import {
   BarChart3,
   Boxes,
@@ -340,9 +341,7 @@ export default function Workspace() {
   if (loading && !me)
     return (
       <main className="splash">
-        <div className="brand-icon">
-          <ShoppingBag />
-        </div>
+        <BrandMark />
         <p>Opening your workspace…</p>
       </main>
     );
@@ -351,10 +350,8 @@ export default function Workspace() {
       <main className="login">
         <section className="login-story">
           <div className="brand">
-            <div className="brand-icon">
-              <ShoppingBag />
-            </div>
-            ShopFlow
+            <BrandMark inverse />
+            <BrandName />
           </div>
           <div>
             <p className="eyebrow">LESS ADMIN. MORE SHOP.</p>
@@ -476,10 +473,8 @@ export default function Workspace() {
     <div className="app-shell">
       <aside className="sidebar">
         <Link href="/" className="brand">
-          <span className="brand-icon">
-            <ShoppingBag size={21} />
-          </span>
-          ShopFlow<span className="brand-dot">.</span>
+          <BrandMark inverse />
+          <BrandName />
         </Link>
         <div className="store-card">
           <div className="store-avatar">{business.slice(0, 1)}</div>

@@ -1,5 +1,7 @@
 # ShopFlow screenshot gallery
 
+Current gallery: **11 screenshots** (8 desktop, 3 mobile), all showing the current retail theme and custom ShopFlow logo. Each filename represents the latest capture of that screen. Older images are replaced in place; no previous-version copies are kept in this folder.
+
 These are real browser captures of the working local application with fictional sample data. The sample store is **Ceylon Corner** and the signed-in display name is **Store Owner**. The app itself has no fixed author name in the dashboard. The sign-in fields are empty; no passwords, session tokens, private contacts or real customer records are shown.
 
 Use the original JPEG files below in a portfolio, case study or project presentation. The source package contains the same gallery locally. The sample database and its login credentials are not included.
@@ -62,11 +64,17 @@ Narrow responsive layouts for the dashboard and product catalogue. Original imag
 | ----------------------------------------------------- | --------------------------------------------------- |
 | ![ShopFlow mobile dashboard](08-dashboard-mobile.jpg) | ![ShopFlow mobile point of sale](09-pos-mobile.jpg) |
 
+### Branded mobile sign-in
+
+The custom ShopFlow mark and wordmark on a narrow sign-in screen.
+
+![ShopFlow mobile sign-in](11-login-mobile.jpg)
+
 ## Refreshing the gallery after a change
 
 1. Run an isolated local preview with fictional data. Keep real customer and business information out of screenshots.
 2. Update the relevant screen, wait for loading to finish and capture the actual browser view.
-3. Replace the matching JPEG file, keeping its filename so README links continue to work. Keep credential fields empty in sign-in images.
+3. Replace the matching JPEG file, keeping its filename so README links continue to work. Keep credential fields empty in sign-in images. Remove obsolete screenshots and their gallery links rather than keeping old versions, backup copies or archive subfolders here.
 4. Inspect each image for layout problems and private information, then copy reviewed images into the separate GitHub clone and commit them.
 
 The dashboard, inventory, checkout and sign-in captures were refreshed with the retail theme and real photography. Photography sources and permissions are listed in [PHOTOS.md](../PHOTOS.md).

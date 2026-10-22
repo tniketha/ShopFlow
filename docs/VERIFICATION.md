@@ -14,6 +14,10 @@ The implementation was checked locally on Windows with Node.js 22.14.0.
 - Photo browser checks: uploaded a real JPEG through the file chooser, saved it, reloaded the page and verified the private photo URL; switched it to a library photo and verified the result in checkout. All nine product photographs loaded successfully.
 - Retail theme checks: desktop dashboard, inventory, checkout, reports, purchasing, sales and sign-in; mobile dashboard, checkout and photo editor. Basket photo thumbnails, selected-product quantities, stock indicators and exact LKR totals were checked. The screenshot gallery uses the updated retail theme and fictional store data.
 
+Brand checks: API/web type checks and production build passed after adding the custom SVG logo. All logo/favicon/touch-icon URLs returned HTTP 200 with image content types. Browser checks confirmed icon metadata and readable desktop/mobile sign-in branding. SVG wordmarks use outlined lettering; PNG exports were visually reviewed.
+
+The full gallery was recaptured with the current logo: eight desktop screenshots at 1440 × 1000 and three mobile screenshots at 390 × 844. Only one current capture per screen is retained; existing files were replaced in place.
+
 The preview's temporary accounts, credentials and database are excluded from the source distribution and the independent Desktop app copy. Run Setup.cmd to create your own store and owner.
 
 GitHub CI runs the checks on Windows and Linux. The original CI passed on both operating systems after placing the Windows runner's test database in its user-owned temporary directory. See the repository's Actions tab for the latest commit's status. The repository contains deployment configuration, but live hosting is not provisioned. PDF generation and export format checks passed; non-Latin font coverage and real-shop acceptance remain operational checks documented in README.md.
