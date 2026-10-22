@@ -10,7 +10,7 @@ Explore the [desktop and mobile screenshot gallery](docs/screenshots/README.md).
 
 The retail interface pairs forest-green navigation with warm neutral surfaces, clear product prices and stock indicators. Real reference photographs are bundled for common grocery products. Owners and managers can choose a photo or upload their own through **Inventory → Edit → Product photo**. See [product photos, updating an existing database, and photography credits](docs/PHOTOS.md).
 
-Reusable SVG and transparent PNG logos are included in the [brand assets](docs/BRAND.md). See the [proposed feature roadmap](docs/ROADMAP.md) for the next improvements.
+Reusable SVG and transparent PNG logos are included in the [brand assets](docs/BRAND.md). Product filters, personal favourites, 7/30-day sales insights, CSV import with preview and barcode checkout are included. See the [feature guide and existing-installation migration commands](docs/FEATURES.md), and the [small follow-up roadmap](docs/ROADMAP.md).
 
 ShopFlow uses TypeScript, Next.js 16 App Router, React 19, Tailwind CSS 4, Fastify 5, PostgreSQL and Prisma 7.10.1 with the PostgreSQL driver adapter. Dependency versions are recorded in `package-lock.json`. Prisma 7.10.1 is pinned as the stable release; the registry's Prisma 8 tag was a release candidate when this project was created.
 
@@ -68,7 +68,7 @@ The source ZIP intentionally excludes credentials, dependencies, database record
 
 1. **Inventory:** add categories and products. Prices and costs are entered in LKR, with at most two decimal places. New products have zero stock. Edit product details or archive products; archived products remain in historical transactions.
 2. **Purchases:** create a supplier, choose products and quantities, then receive the purchase. This increases stock, records movements and updates the latest unit cost. Click category or supplier labels to edit; deletion is allowed only while the record is unused.
-3. **Point of sale:** search by product name or SKU, add products, enter cash received and complete the sale. The server confirms current stock and prices. Download the PDF invoice after saving.
+3. **Point of sale:** search by name, SKU or barcode, filter categories/stock, or open your personal favourites. Scan/type a configured barcode and press Enter to add one unit. Enter cash received and complete the sale. The server confirms current stock and prices. Download the PDF invoice after saving.
 4. **Sales & refunds:** review sales and invoices. Owners and managers can return some or all unreturned units with a reason. A successful refund restores stock and records a separate cash-refund event. Physically return cash only after the operation succeeds.
 5. **Reports:** select Sri Lanka business dates and view sales/refunds or a current stock valuation. Export CSV or PDF.
 6. **Team:** owners create owner, manager and cashier accounts, and disable or enable non-owner accounts. Use the profile avatar to change your own password; this signs out all sessions.

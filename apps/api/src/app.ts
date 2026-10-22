@@ -22,6 +22,21 @@ import {
 import { checkout, purchaseSchema, receivePurchase, refundSale, type Actor } from './trading.js';
 import { invoicePdf, makePdf } from './pdf.js';
 import { photoChoice, preparePhoto } from './photos.js';
+import {
+  barcodeSchema,
+  catalogueProduct,
+  favouriteProduct,
+  listProducts,
+  productDetails,
+  productQuery,
+} from './catalogue.js';
+import {
+  importBody,
+  importPreviewBody,
+  importProducts,
+  previewProductImport,
+} from './product-import.js';
+import { salesAnalytics } from './analytics.js';
 type Identity = Actor & { email: string; name: string; csrf: string };
 declare module 'fastify' {
   interface FastifyRequest {
@@ -29,17 +44,7 @@ declare module 'fastify' {
   }
 }
 const manager = ['OWNER', 'MANAGER'] as const;
-const productBody = z
-  .object({
-    sku: z.string().trim().min(1).max(60),
-    name: z.string().trim().min(1).max(160),
-    priceMinor: money,
-    costMinor: money,
-    reorderLevel: z.number().int().min(0).max(1_000_000),
-    categoryId: id.nullable().optional(),
-    photo: photoChoice.optional(),
-  })
-  .strict();
+const productBody = productDetails.extend({ photo: photoChoice.optional() }).strict();
 const dateQuery = z
   .object({
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -395,33 +400,54 @@ export function buildApp(
     });
   }
   app.get('/products', { preHandler: auth }, async (req) => {
-    const { page, search } = pageQuery.parse(req.query);
-    const where = {
-      businessId: req.identity!.businessId,
-      active: true,
-      OR: [
-        { name: { contains: search, mode: 'insensitive' as const } },
-        { sku: { contains: search, mode: 'insensitive' as const } },
-      ],
-    };
-    const [items, count] = await db.$transaction([
-      db.product.findMany({
-        where,
-        include: { category: true },
-        orderBy: { name: 'asc' },
-        skip: (page - 1) * 50,
-        take: 50,
-      }),
-      db.product.count({ where }),
-    ]);
-    return {
-      items: items.map((p) =>
-        req.identity!.role === 'CASHIER' ? { ...p, costMinor: undefined } : p,
-      ),
-      count,
-      page,
-      pageSize: 50,
-    };
+    return listProducts(db, req.identity!, productQuery.parse(req.query));
+  });
+  app.get('/products/lookup', { preHandler: auth }, async (req) => {
+    const { barcode } = z.object({ barcode: barcodeSchema }).strict().parse(req.query);
+    const product = await db.product.findFirst({
+      where: { businessId: req.identity!.businessId, barcode, active: true },
+      include: {
+        category: true,
+        favourites: { where: { userId: req.identity!.id }, select: { userId: true } },
+      },
+    });
+    if (!product) throw new AppError(404, 'No active product has that barcode');
+    return catalogueProduct(product, req.identity!);
+  });
+  app.patch('/products/:id/favourite', { preHandler: auth }, async (req) => {
+    const productId = id.parse((req.params as { id: string }).id);
+    const { favourite } = z.object({ favourite: z.boolean() }).strict().parse(req.body);
+    return favouriteProduct(db, req.identity!, productId, favourite);
+  });
+  app.post(
+    '/products/import/preview',
+    {
+      preHandler: allow(manager),
+      bodyLimit: 1024 * 1024,
+      config: { rateLimit: { max: 15, timeWindow: '1 minute' } },
+    },
+    async (req) => {
+      const { csv } = importPreviewBody.parse(req.body);
+      return previewProductImport(db, req.identity!.businessId, csv);
+    },
+  );
+  app.post(
+    '/products/import',
+    {
+      preHandler: allow(manager),
+      bodyLimit: 1024 * 1024,
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    },
+    async (req) => {
+      return importProducts(db, req.identity!, importBody.parse(req.body));
+    },
+  );
+  app.get('/analytics/sales', { preHandler: allow(manager) }, async (req) => {
+    const { days } = z
+      .object({ days: z.enum(['7', '30']).default('7') })
+      .strict()
+      .parse(req.query);
+    return salesAnalytics(db, req.identity!.businessId, days === '7' ? 7 : 30);
   });
   app.get('/products/:id/photo', { preHandler: auth }, async (req, reply) => {
     const productId = id.parse((req.params as { id: string }).id);

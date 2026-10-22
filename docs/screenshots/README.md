@@ -1,6 +1,6 @@
 # ShopFlow screenshot gallery
 
-Current gallery: **11 screenshots** (8 desktop, 3 mobile), all showing the current retail theme and custom ShopFlow logo. Each filename represents the latest capture of that screen. Older images are replaced in place; no previous-version copies are kept in this folder.
+Current gallery: **12 screenshots** (9 desktop, 3 mobile), showing the current retail theme, custom ShopFlow logo and catalogue tools. Each filename represents the latest capture of that screen. Older images are replaced in place; no previous-version copies are kept in this folder.
 
 These are real browser captures of the working local application with fictional sample data. The sample store is **Ceylon Corner** and the signed-in display name is **Store Owner**. The app itself has no fixed author name in the dashboard. The sign-in fields are empty; no passwords, session tokens, private contacts or real customer records are shown.
 
@@ -10,19 +10,19 @@ Use the original JPEG files below in a portfolio, case study or project presenta
 
 ### Store dashboard
 
-Daily sales totals, refund totals, low-stock alerts and a checkout shortcut.
+Daily totals, a 7/30-day net-sales chart, top-selling products and low-stock alerts.
 
 ![ShopFlow desktop dashboard](01-dashboard-desktop.jpg)
 
 ### Inventory
 
-Products, categories, prices, unit costs, stock levels and reorder status.
+Products, category/stock filters, price sorting, personal favourites and reorder status.
 
 ![ShopFlow desktop inventory](02-inventory-desktop.jpg)
 
 ### Point of sale
 
-Real product photographs, a two-item basket, exact LKR totals and cash received. This screenshot shows a basket before confirmation.
+Real product photographs, barcode entry, personal favourites, a two-item basket and exact LKR totals. This screenshot shows a basket before confirmation.
 
 ![ShopFlow desktop point of sale](03-pos-desktop.jpg)
 
@@ -55,6 +55,12 @@ The default sign-in screen with empty credential fields and generic ShopFlow bra
 Choose a reference photograph or upload an actual product photo. The editor is scrolled to show the photo controls.
 
 ![ShopFlow product photo editor](10-photo-editor-desktop.jpg)
+
+### CSV import preview
+
+Row-level validation catches an invalid decimal price before import. Preview saves no products.
+
+![ShopFlow CSV import preview](12-csv-import-desktop.jpg)
 
 ## Mobile
 

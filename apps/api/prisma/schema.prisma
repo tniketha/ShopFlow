@@ -39,6 +39,8 @@ model User {
   active Boolean @default(true)
   createdAt DateTime @default(now())
   sessions Session[]
+  favourites ProductFavourite[]
+  imports ProductImport[]
   @@unique([businessId, id])
 }
 model Session {
@@ -72,6 +74,7 @@ model Product {
   businessId String
   business Business @relation(fields: [businessId], references: [id])
   sku String
+  barcode String?
   name String
   priceMinor Int
   photoKey String?
@@ -86,9 +89,30 @@ model Product {
   lines SaleLine[]
   movements StockMovement[]
   purchaseLines PurchaseLine[]
+  favourites ProductFavourite[]
   @@unique([businessId, id])
   @@unique([businessId, sku])
+  @@unique([businessId, barcode])
   @@index([businessId, active])
+}
+model ProductFavourite {
+  userId String
+  productId String
+  businessId String
+  user User @relation(fields: [businessId, userId], references: [businessId, id], onDelete: Cascade)
+  product Product @relation(fields: [businessId, productId], references: [businessId, id], onDelete: Cascade)
+  @@id([userId, productId])
+  @@index([businessId, userId])
+}
+model ProductImport {
+  businessId String
+  requestKey String
+  requestHash String
+  actorId String
+  actor User @relation(fields: [businessId, actorId], references: [businessId, id])
+  createdCount Int
+  createdAt DateTime @default(now())
+  @@id([businessId, requestKey])
 }
 model ProductPhoto {
   productId String @id

@@ -1,9 +1,11 @@
 'use client';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ProductPhoto, PhotoPicker } from './product-photo';
 import { BrandMark, BrandName } from './brand';
+import { SalesInsights } from './sales-insights';
+import { CsvImport } from './csv-import';
 import {
   BarChart3,
   Boxes,
@@ -17,6 +19,9 @@ import {
   PackagePlus,
   Plus,
   Search,
+  ScanLine,
+  Star,
+  Upload,
   ShieldCheck,
   ShoppingBag,
   ShoppingCart,
@@ -43,6 +48,8 @@ type Product = {
   category?: { name: string };
   photoKey?: string | null;
   photoVersion?: string | null;
+  barcode?: string | null;
+  isFavourite?: boolean;
 };
 type Sale = {
   id: string;
@@ -174,6 +181,17 @@ export default function Workspace() {
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [stockFilter, setStockFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('name-asc');
+  const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const [favouriteBusy, setFavouriteBusy] = useState<string | null>(null);
+  const [barcode, setBarcode] = useState('');
+  const [barcodeBusy, setBarcodeBusy] = useState(false);
+  const barcodeInput = useRef<HTMLInputElement>(null);
+  const scanInFlight = useRef(false);
+  const refreshSequence = useRef(0);
+  const [importOpen, setImportOpen] = useState(false);
   const [categories, setCategories] = useState<Named[]>([]);
   const [suppliers, setSuppliers] = useState<Named[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -223,28 +241,53 @@ export default function Workspace() {
     },
     [csrf],
   );
-  const refresh = useCallback(async () => {
-    if (!me) return;
-    if (section === 'overview') setDashboard(await api<Dashboard>('/dashboard'));
-    if (['inventory', 'pos', 'purchases'].includes(section)) {
-      const data = await api<{ items: Product[]; count: number }>(
-        `/products?page=${page}&search=${encodeURIComponent(search)}`,
-      );
-      setProducts(data.items);
-      setCount(data.count);
-    }
-    if (section === 'inventory') {
-      setCategories(await api<Named[]>('/categories'));
-      if (managed) setMovements(await api<Movement[]>('/movements'));
-    }
-    if (section === 'purchases' && managed) {
-      setSuppliers(await api<Named[]>('/suppliers'));
-      setPurchases(await api<Purchase[]>('/purchases'));
-    }
-    if (section === 'sales') setSales(await api<Sale[]>(`/sales?page=${page}`));
-    if (section === 'team' && me.role === 'OWNER') setTeam(await api<User[]>('/users'));
-    if (section === 'audit' && managed) setAudit(await api<Audit[]>(`/audit?page=${page}`));
-  }, [api, me, section, page, search, managed]);
+  const refresh = useCallback(
+    async (isCurrent: () => boolean = () => true) => {
+      if (!me) return;
+      const sequence = ++refreshSequence.current;
+      const current = () => isCurrent() && sequence === refreshSequence.current;
+      async function load<T>(path: string, setter: (data: T) => void) {
+        const data = await api<T>(path);
+        if (current()) setter(data);
+      }
+      const jobs: Promise<void>[] = [];
+      if (section === 'overview') jobs.push(load('/dashboard', setDashboard));
+      if (['inventory', 'pos', 'purchases'].includes(section)) {
+        jobs.push(
+          (async () => {
+            const query = new URLSearchParams({
+              page: String(page),
+              search,
+              stock: stockFilter,
+              sort: sortBy,
+              favourites: String(favouritesOnly),
+              ...(categoryFilter ? { categoryId: categoryFilter } : {}),
+            });
+            const data = await api<{ items: Product[]; count: number }>(`/products?${query}`);
+            if (!current()) return;
+            setProducts(data.items);
+            setCount(data.count);
+            if (page > Math.max(1, Math.ceil(data.count / 50)))
+              setPage(Math.max(1, Math.ceil(data.count / 50)));
+          })(),
+        );
+        jobs.push(load('/categories', setCategories));
+      }
+      if (section === 'inventory') {
+        if (managed) jobs.push(load('/movements', setMovements));
+      }
+      if (section === 'purchases' && managed) {
+        jobs.push(load('/suppliers', setSuppliers), load('/purchases', setPurchases));
+      }
+      if (section === 'sales') jobs.push(load(`/sales?page=${page}`, setSales));
+      if (section === 'team' && me.role === 'OWNER') jobs.push(load('/users', setTeam));
+      if (section === 'audit' && managed) jobs.push(load(`/audit?page=${page}`, setAudit));
+      await Promise.all(jobs);
+    },
+    [api, me, section, page, search, managed, categoryFilter, stockFilter, sortBy, favouritesOnly],
+  );
+  const refreshCurrent = useRef(refresh);
+  refreshCurrent.current = refresh;
   useEffect(() => {
     api<{ user: User; csrf: string; business: { name: string } }>('/auth/me')
       .then((data) => {
@@ -262,6 +305,11 @@ export default function Workspace() {
     setSearch('');
     setError('');
     setNotice('');
+    setCategoryFilter('');
+    setStockFilter('all');
+    setSortBy('name-asc');
+    setFavouritesOnly(false);
+    setBarcode('');
   }, [section]);
   useEffect(() => {
     if (!me) return;
@@ -269,7 +317,7 @@ export default function Workspace() {
     setLoading(true);
     const timer = setTimeout(
       () =>
-        refresh()
+        refresh(() => alive)
           .catch((e) => {
             if (alive) setError(e.message);
           })
@@ -303,7 +351,7 @@ export default function Workspace() {
     sessionStorage.setItem(storageKey, JSON.stringify(request));
     setPending(request);
     try {
-      const result = await api<Sale>(request.path, request.body);
+      const result = await api<Sale & { createdCount?: number }>(request.path, request.body);
       sessionStorage.removeItem(storageKey);
       setPending(null);
       if (request.path === '/sales') {
@@ -314,11 +362,15 @@ export default function Workspace() {
       if (request.path === '/purchases')
         setPurchaseLines([{ productId: '', quantity: 1, cost: '0.00' }]);
       setRefunding(null);
-      setNotice('Transaction saved.');
-      await refresh();
+      setNotice(
+        request.path === '/products/import'
+          ? `${result.createdCount} products imported with zero stock.`
+          : 'Transaction saved.',
+      );
+      await refreshCurrent.current();
     } catch (e) {
       const status = (e as { status?: number }).status;
-      if (status && [400, 403, 404, 409].includes(status)) {
+      if (status && [400, 403, 404, 409, 413].includes(status)) {
         sessionStorage.removeItem(storageKey);
         setPending(null);
       }
@@ -337,6 +389,44 @@ export default function Workspace() {
       setCsrf(result.csrf);
       window.location.assign('/');
     });
+  }
+  function addToCart(product: Product) {
+    setCart((current) => {
+      const found = current.find((line) => line.product.id === product.id);
+      return found
+        ? current.map((line) =>
+            line.product.id === product.id
+              ? { ...line, quantity: Math.min(product.stock, line.quantity + 1) }
+              : line,
+          )
+        : [...current, { product, quantity: 1 }];
+    });
+  }
+  async function toggleFavourite(product: Product) {
+    setFavouriteBusy(product.id);
+    setError('');
+    try {
+      await api(`/products/${product.id}/favourite`, { favourite: !product.isFavourite }, 'PATCH');
+      await refreshCurrent.current();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Favourite could not be saved.');
+    } finally {
+      setFavouriteBusy(null);
+    }
+  }
+  function favouriteButton(product: Product) {
+    return (
+      <button
+        type="button"
+        className={'favourite-toggle' + (product.isFavourite ? ' selected' : '')}
+        disabled={!!favouriteBusy || busy || !!pending}
+        aria-label={`${product.isFavourite ? 'Remove' : 'Add'} ${product.name} ${product.isFavourite ? 'from' : 'to'} favourites`}
+        aria-pressed={!!product.isFavourite}
+        onClick={() => toggleFavourite(product)}
+      >
+        <Star size={16} fill={product.isFavourite ? 'currentColor' : 'none'} />
+      </button>
+    );
   }
   if (loading && !me)
     return (
@@ -421,43 +511,142 @@ export default function Workspace() {
   const title = links.find((l) => l[0] === pathname)?.[1] ?? 'Page not found';
   const total = cart.reduce((n, l) => n + l.product.priceMinor * l.quantity, 0);
   const productSearch = (
-    <div className="toolbar">
-      <div className="search">
-        <Search size={18} />
-        <input
-          aria-label="Search products"
-          placeholder="Search products or SKU…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
+    <div className="catalogue-controls">
+      <div className="toolbar">
+        <div className="search">
+          <Search size={18} />
+          <input
+            aria-label="Search products"
+            placeholder="Search products, SKU or barcode…"
+            value={search}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.preventDefault();
+            }}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <span className="muted">{count} products</span>
+        <button
+          type="button"
+          className="icon-button"
+          disabled={page === 1}
+          onClick={() => setPage(page - 1)}
+          aria-label="Previous products"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <span>{page}</span>
+        <button
+          type="button"
+          className="icon-button"
+          disabled={page * 50 >= count}
+          onClick={() => setPage(page + 1)}
+          aria-label="Next products"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      <div className="catalogue-filters">
+        <label>
+          Category
+          <select
+            aria-label="Filter category"
+            value={categoryFilter}
+            onChange={(event) => {
+              setCategoryFilter(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="">All categories</option>
+            <option value="uncategorized">Uncategorized</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Stock
+          <select
+            aria-label="Stock status"
+            value={stockFilter}
+            onChange={(event) => {
+              setStockFilter(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="all">All stock</option>
+            <option value="in_stock">In stock</option>
+            <option value="low">Low stock</option>
+            <option value="out">Out of stock</option>
+          </select>
+        </label>
+        <label>
+          Sort by
+          <select
+            aria-label="Sort products"
+            value={sortBy}
+            onChange={(event) => {
+              setSortBy(event.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="name-asc">Name A–Z</option>
+            <option value="name-desc">Name Z–A</option>
+            <option value="price-asc">Price: low to high</option>
+            <option value="price-desc">Price: high to low</option>
+            <option value="stock-asc">Stock: low to high</option>
+            <option value="stock-desc">Stock: high to low</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          className={'favourites-filter' + (favouritesOnly ? ' selected' : '')}
+          aria-pressed={favouritesOnly}
+          onClick={() => {
+            setFavouritesOnly(!favouritesOnly);
             setPage(1);
           }}
-        />
+        >
+          <Star size={15} fill={favouritesOnly ? 'currentColor' : 'none'} /> Favourites
+        </button>
+        <button
+          type="button"
+          className="clear-filters"
+          disabled={
+            !search &&
+            !categoryFilter &&
+            stockFilter === 'all' &&
+            sortBy === 'name-asc' &&
+            !favouritesOnly
+          }
+          onClick={() => {
+            setSearch('');
+            setCategoryFilter('');
+            setStockFilter('all');
+            setSortBy('name-asc');
+            setFavouritesOnly(false);
+            setPage(1);
+          }}
+        >
+          Clear
+        </button>
       </div>
-      <span className="muted">{count} products</span>
-      <button
-        className="icon-button"
-        disabled={page === 1}
-        onClick={() => setPage(page - 1)}
-        aria-label="Previous products"
-      >
-        <ChevronLeft size={18} />
-      </button>
-      <span>{page}</span>
-      <button
-        className="icon-button"
-        disabled={page * 50 >= count}
-        onClick={() => setPage(page + 1)}
-        aria-label="Next products"
-      >
-        <ChevronRight size={18} />
-      </button>
     </div>
   );
-  function modal(titleText: string, children: React.ReactNode, close: () => void) {
+  function modal(titleText: string, children: React.ReactNode, close: () => void, wide = false) {
     return (
       <div className="overlay">
-        <section className="modal" role="dialog" aria-modal="true" aria-label={titleText}>
+        <section
+          className={'modal' + (wide ? ' wide-modal' : '')}
+          role="dialog"
+          aria-modal="true"
+          aria-label={titleText}
+        >
           <div className="panel-heading">
             <h2>{titleText}</h2>
             <button className="icon-button" onClick={close} aria-label="Close">
@@ -567,10 +756,15 @@ export default function Workspace() {
               </Link>
             )}
             {section === 'inventory' && managed && (
-              <button className="primary" onClick={() => setEditing('new')}>
-                <Plus size={18} />
-                Add product
-              </button>
+              <div className="row-actions">
+                <button disabled={busy || !!pending} onClick={() => setImportOpen(true)}>
+                  <Upload size={16} /> Import CSV
+                </button>
+                <button className="primary" onClick={() => setEditing('new')}>
+                  <Plus size={18} />
+                  Add product
+                </button>
+              </div>
             )}
           </div>
           {error && (
@@ -630,6 +824,7 @@ export default function Workspace() {
                   note="Recorded on today’s date"
                 />
               </div>
+              {managed && <SalesInsights load={api} />}
               <div className="overview-grid">
                 <section className="panel">
                   <div className="panel-heading">
@@ -719,68 +914,111 @@ export default function Workspace() {
                   </div>
                   <span className="badge green">Cash · LKR</span>
                 </div>
+                <form
+                  className="barcode-entry"
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    if (scanInFlight.current || busy || pending || !barcode.trim()) return;
+                    scanInFlight.current = true;
+                    setBarcodeBusy(true);
+                    setError('');
+                    try {
+                      const product = await api<Product>(
+                        `/products/lookup?barcode=${encodeURIComponent(barcode.trim())}`,
+                      );
+                      if (!product.stock) throw new Error('That product is out of stock.');
+                      if (
+                        (cart.find((line) => line.product.id === product.id)?.quantity ?? 0) >=
+                        product.stock
+                      )
+                        throw new Error('All available units are already in your basket.');
+                      addToCart(product);
+                      setBarcode('');
+                      setNotice(product.name + ' added to basket.');
+                    } catch (failure) {
+                      setError(
+                        failure instanceof Error ? failure.message : 'Barcode lookup failed.',
+                      );
+                    } finally {
+                      scanInFlight.current = false;
+                      setBarcodeBusy(false);
+                      barcodeInput.current?.focus();
+                    }
+                  }}
+                >
+                  <ScanLine size={20} />
+                  <label className="sr-only" htmlFor="barcode-scan">
+                    Scan or enter barcode
+                  </label>
+                  <input
+                    id="barcode-scan"
+                    ref={barcodeInput}
+                    value={barcode}
+                    maxLength={64}
+                    placeholder="Scan or enter a barcode"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    readOnly={barcodeBusy || busy || !!pending}
+                    onChange={(event) => setBarcode(event.target.value)}
+                  />
+                  <button disabled={barcodeBusy || busy || !!pending || !barcode.trim()}>
+                    {barcodeBusy ? 'Finding…' : 'Add item'}
+                  </button>
+                </form>
                 {productSearch}
                 <div className="product-grid">
                   {products.map((p) => (
-                    <button
-                      key={p.id}
-                      className={
-                        'product-card' +
-                        (cart.some((line) => line.product.id === p.id) ? ' in-basket' : '')
-                      }
-                      disabled={p.stock === 0 || busy || !!pending}
-                      onClick={() =>
-                        setCart((current) => {
-                          const found = current.find((l) => l.product.id === p.id);
-                          return found
-                            ? current.map((l) =>
-                                l.product.id === p.id
-                                  ? { ...l, quantity: Math.min(p.stock, l.quantity + 1) }
-                                  : l,
-                              )
-                            : [...current, { product: p, quantity: 1 }];
-                        })
-                      }
-                    >
-                      <ProductPhoto product={p} large />
-                      {cart.some((line) => line.product.id === p.id) && (
-                        <span className="basket-count">
-                          {cart.find((line) => line.product.id === p.id)!.quantity} in basket
-                        </span>
-                      )}
-                      <span className="product-meta">
-                        <span className="product-sku">{p.sku}</span>
-                        <span
-                          className={
-                            'stock-indicator ' +
-                            (p.stock === 0
-                              ? 'sold-out'
+                    <div className="product-tile" key={p.id}>
+                      <button
+                        className={
+                          'product-card' +
+                          (cart.some((line) => line.product.id === p.id) ? ' in-basket' : '')
+                        }
+                        disabled={p.stock === 0 || busy || !!pending}
+                        onClick={() => addToCart(p)}
+                      >
+                        <ProductPhoto product={p} large />
+                        {cart.some((line) => line.product.id === p.id) && (
+                          <span className="basket-count">
+                            {cart.find((line) => line.product.id === p.id)!.quantity} in basket
+                          </span>
+                        )}
+                        <span className="product-meta">
+                          <span className="product-sku">{p.sku}</span>
+                          <span
+                            className={
+                              'stock-indicator ' +
+                              (p.stock === 0
+                                ? 'sold-out'
+                                : p.stock <= p.reorderLevel
+                                  ? 'stock-low'
+                                  : '')
+                            }
+                          >
+                            {p.stock === 0
+                              ? 'Sold out'
                               : p.stock <= p.reorderLevel
-                                ? 'stock-low'
-                                : '')
-                          }
-                        >
-                          {p.stock === 0
-                            ? 'Sold out'
-                            : p.stock <= p.reorderLevel
-                              ? 'Low stock'
-                              : 'In stock'}
+                                ? 'Low stock'
+                                : 'In stock'}
+                          </span>
                         </span>
-                      </span>
-                      <strong>{p.name}</strong>
-                      <span className="product-category">{p.category?.name ?? 'General'}</span>
-                      <span className="product-card-footer">
-                        <span className="product-price">{currency(p.priceMinor)}</span>
-                        <span className="add-product-icon" aria-hidden="true">
-                          <Plus size={16} />
+                        <strong>{p.name}</strong>
+                        <span className="product-category">{p.category?.name ?? 'General'}</span>
+                        <span className="product-card-footer">
+                          <span className="product-price">{currency(p.priceMinor)}</span>
+                          <span className="add-product-icon" aria-hidden="true">
+                            <Plus size={16} />
+                          </span>
                         </span>
-                      </span>
-                      <small>{p.stock} available</small>
-                    </button>
+                        <small>{p.stock} available</small>
+                      </button>
+                      {favouriteButton(p)}
+                    </div>
                   ))}
                 </div>
                 {!products.length && (
-                  <Empty text="Add products and receive stock to start selling." />
+                  <Empty text="No products found. Try another search or clear filters. Star products to build your favourites." />
                 )}
               </section>
               <section className="panel basket">
@@ -906,6 +1144,7 @@ export default function Workspace() {
                         <tr key={p.id}>
                           <td>
                             <div className="product-identity">
+                              {favouriteButton(p)}
                               <ProductPhoto product={p} />
                               <div>
                                 <strong>{p.name}</strong>
@@ -939,7 +1178,7 @@ export default function Workspace() {
                   </table>
                 </div>
                 {!products.length && (
-                  <Empty text="Your product catalogue starts here. Add your first product." />
+                  <Empty text="No products found. Try another search or clear filters." />
                 )}
               </section>
               {managed && (
@@ -1628,6 +1867,28 @@ export default function Workspace() {
           </form>,
           () => setEditingNamed(null),
         )}
+      {importOpen &&
+        modal(
+          'Import products',
+          <CsvImport
+            disabled={busy || !!pending}
+            pending={pending?.path === '/products/import'}
+            preview={(csv) => api('/products/import/preview', { csv })}
+            onImport={async (csv) => {
+              await submitOnce({
+                path: '/products/import',
+                body: { csv, requestKey: crypto.randomUUID() },
+              });
+              setImportOpen(false);
+            }}
+            onRetry={async () => {
+              if (pending?.path === '/products/import') await submitOnce(pending);
+              setImportOpen(false);
+            }}
+          />,
+          () => setImportOpen(false),
+          true,
+        )}
       {editing &&
         modal(
           editing === 'new' ? 'Add a product' : 'Edit product',
@@ -1644,6 +1905,7 @@ export default function Workspace() {
                   costMinor: minor(String(data.get('cost'))),
                   reorderLevel: Number(data.get('reorderLevel')),
                   categoryId: data.get('categoryId') || null,
+                  barcode: String(data.get('barcode') ?? '').trim() || null,
                   ...(data.get('photo') ? { photo: JSON.parse(String(data.get('photo'))) } : {}),
                 };
                 await api(
@@ -1674,6 +1936,18 @@ export default function Workspace() {
                 maxLength={60}
                 required
               />
+            </label>
+            <label>
+              Barcode (optional)
+              <input
+                name="barcode"
+                defaultValue={editing === 'new' ? '' : (editing.barcode ?? '')}
+                maxLength={64}
+                autoComplete="off"
+              />
+              <small>
+                Use the code printed on the product. Barcodes must be unique within your store.
+              </small>
             </label>
             <div className="two-col">
               <label>

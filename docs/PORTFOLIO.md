@@ -12,7 +12,8 @@ Author and project owner: **tniketha**.
 2. **Checkout** — use `screenshots/03-pos-desktop.jpg` to show the primary store workflow.
 3. **Inventory** — use `screenshots/02-inventory-desktop.jpg` for catalogue and stock management.
 4. **Reports** — use `screenshots/04-reports-desktop.jpg` for reporting and exports.
-5. **Responsive views** — use the two mobile screenshots to show the narrow layout.
+5. **CSV preview** — use `screenshots/12-csv-import-desktop.jpg` to show row validation before saving.
+6. **Responsive views** — use the three mobile screenshots to show the narrow layout.
 
 The [complete screenshot gallery](screenshots/README.md) also includes purchasing, sales history, sign-in and the product photo editor.
 
@@ -26,7 +27,10 @@ The [complete screenshot gallery](screenshots/README.md) also includes purchasin
 - **Money:** integer LKR cents with decimal-string parsing and bounds checks.
 - **Product photography:** bundled real reference photos, optional private photo uploads, image validation, metadata removal and business-scoped access.
 - **Retail design:** forest-green navigation, warm neutral surfaces, photo-led product cards, clear LKR prices and stock status, with responsive desktop and mobile layouts.
-- **Verification:** 14 unit tests and 22 real PostgreSQL integration tests, including concurrent operations and photo isolation. GitHub CI verifies Windows and Linux.
+- **Catalogue tools:** combined filtering/sorting, personal favourites and store-scoped barcode uniqueness.
+- **Import safety:** CSV parsing, row-level preview, exact decimal conversion, atomic writes and safe retries.
+- **Analytics:** Colombo-day aggregation, zero-filled charts, refund-date accounting and historical snapshots.
+- **Verification:** 14 unit tests and 32 real PostgreSQL integration tests, including concurrent operations, imports, analytics and photo isolation. GitHub CI verifies Windows and Linux.
 
 Repository: [github.com/tniketha/ShopFlow](https://github.com/tniketha/ShopFlow).
 

@@ -13,6 +13,11 @@ All routes are on Fastify at port 4000. The browser uses the same routes through
 | POST          | `/auth/password`                                                | Current/new password; revokes all own sessions                       |
 | GET           | `/dashboard`                                                    | Daily sales totals and low-stock products                            |
 | GET           | `/products?page=1&search=tea`                                   | Paginated active products; cashier costs omitted                     |
+| GET           | `/products/lookup?barcode=8901234567890`                        | Exact active barcode in the current store; cashier costs omitted     |
+| PATCH         | `/products/:id/favourite`                                       | Any signed-in role: set own favourite with `{ "favourite": true }`   |
+| POST          | `/products/import/preview`                                      | Owner/manager: validate `{ "csv": "..." }` without writes            |
+| POST          | `/products/import`                                              | Owner/manager: atomic `{ "csv": "...", "requestKey": "<UUID>" }`     |
+| GET           | `/analytics/sales?days=7`                                       | Owner/manager: daily net sales and top five; days must be 7 or 30    |
 | GET           | `/products/:id/photo`                                           | Authenticated JPEG in the current business; no-store                 |
 | POST          | `/products`                                                     | Owner/manager: create with zero stock                                |
 | PATCH         | `/products/:id`                                                 | Owner/manager: catalogue fields / active flag; stock is not writable |
@@ -44,11 +49,20 @@ Product:
   "costMinor": 7000,
   "reorderLevel": 5,
   "categoryId": null,
+  "barcode": "8901234567890",
   "photo": { "kind": "library", "key": "tea" }
 }
 ```
 
 `photo` is optional on product creation and update. Omission retains the current photo. Choices are `{ "kind": "automatic" }`, `{ "kind": "none" }`, `{ "kind": "library", "key": "tea" }`, or `{ "kind": "upload", "data": "data:image/jpeg;base64,..." }`. Library keys: `rice`, `tea`, `milk`, `coffee`, `sugar`, `soap`, `biscuits`, `oil`, `water`. Uploads also accept PNG/WebP data URLs, with a 512 KB decoded input limit and 20 million pixel limit; the API re-encodes accepted pixels as JPEG. Product write routes have a 768 KB JSON body limit; other routes retain 128 KB. Photo changes and product changes are atomic and share catalogue permissions. Responses include `photoKey` and `photoVersion`, with image bytes fetched separately. See [PHOTOS.md](PHOTOS.md) for storage and backup details.
+
+`barcode` is optional, nullable, case-sensitive and unique within the store (including archived products). It accepts 1–64 letters/digits or `. _ / -`. Omission preserves the existing value on update; null removes it.
+
+Product lists accept `page`, `search`, `categoryId` (UUID or `uncategorized`), `stock` (`all`, `in_stock`, `low`, `out`), `sort` (`name-asc`, `name-desc`, `price-asc`, `price-desc`, `stock-asc`, `stock-desc`) and `favourites` (`true`/`false`). Filters combine; each page has at most 50 rows with stable ID tie-breaking. Responses include the current user's `isFavourite`, never another user's favourite records. Low stock excludes zero quantities.
+
+CSV routes accept up to 512 KB of UTF-8 CSV and 500 rows in a 1 MB JSON body. Required headers are `sku,name,price,cost`; optional headers are `reorderLevel,category,barcode`. Prices/costs use LKR decimal strings. Preview returns rows with values/errors, total and valid counts. Import revalidates, creates products at zero stock and records the request key/hash in one transaction. Any invalid row rolls back the batch. A successful retry returns its original count; changed data with the same key returns 409. Preview is limited to 15 requests/minute and commit to 10. See [FEATURES.md](FEATURES.md).
+
+Analytics returns `days`, `from`, `to`, `daily` (date, grossMinor, refundMinor, netMinor, transactions), `summary`, and `topProducts` (productId, name, units, revenueMinor). Dates use Colombo business boundaries, with zero-filled days and refund-date net accounting. Top products rank by units sold before returns using historical sale snapshots; they contain no costs.
 
 Purchase receipt:
 
