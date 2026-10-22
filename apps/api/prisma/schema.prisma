@@ -74,6 +74,9 @@ model Product {
   sku String
   name String
   priceMinor Int
+  photoKey String?
+  photoVersion String?
+  photo ProductPhoto?
   costMinor Int
   stock Int @default(0)
   reorderLevel Int @default(5)
@@ -86,6 +89,13 @@ model Product {
   @@unique([businessId, id])
   @@unique([businessId, sku])
   @@index([businessId, active])
+}
+model ProductPhoto {
+  productId String @id
+  businessId String
+  product Product @relation(fields: [businessId, productId], references: [businessId, id], onDelete: Cascade)
+  content Bytes
+  @@unique([businessId, productId])
 }
 model Purchase {
   id String @id @default(uuid())

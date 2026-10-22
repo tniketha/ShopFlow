@@ -13,6 +13,7 @@ All routes are on Fastify at port 4000. The browser uses the same routes through
 | POST          | `/auth/password`                                                | Current/new password; revokes all own sessions                       |
 | GET           | `/dashboard`                                                    | Daily sales totals and low-stock products                            |
 | GET           | `/products?page=1&search=tea`                                   | Paginated active products; cashier costs omitted                     |
+| GET           | `/products/:id/photo`                                           | Authenticated JPEG in the current business; no-store                 |
 | POST          | `/products`                                                     | Owner/manager: create with zero stock                                |
 | PATCH         | `/products/:id`                                                 | Owner/manager: catalogue fields / active flag; stock is not writable |
 | GET, POST     | `/categories`                                                   | Read / owner-manager create                                          |
@@ -42,9 +43,12 @@ Product:
   "priceMinor": 12345,
   "costMinor": 7000,
   "reorderLevel": 5,
-  "categoryId": null
+  "categoryId": null,
+  "photo": { "kind": "library", "key": "tea" }
 }
 ```
+
+`photo` is optional on product creation and update. Omission retains the current photo. Choices are `{ "kind": "automatic" }`, `{ "kind": "none" }`, `{ "kind": "library", "key": "tea" }`, or `{ "kind": "upload", "data": "data:image/jpeg;base64,..." }`. Library keys: `rice`, `tea`, `milk`, `coffee`, `sugar`, `soap`, `biscuits`, `oil`, `water`. Uploads also accept PNG/WebP data URLs, with a 512 KB decoded input limit and 20 million pixel limit; the API re-encodes accepted pixels as JPEG. Product write routes have a 768 KB JSON body limit; other routes retain 128 KB. Photo changes and product changes are atomic and share catalogue permissions. Responses include `photoKey` and `photoVersion`, with image bytes fetched separately. See [PHOTOS.md](PHOTOS.md) for storage and backup details.
 
 Purchase receipt:
 

@@ -6,6 +6,8 @@ A store workspace for inventory, purchasing and cash checkout. Author and projec
 
 Explore the [desktop and mobile screenshot gallery](docs/screenshots/README.md). Images show fictional sample store data. See the [portfolio notes](docs/PORTFOLIO.md) for suggested images and a short project description.
 
+The retail interface pairs forest-green navigation with warm neutral surfaces, clear product prices and stock indicators. Real reference photographs are bundled for common grocery products. Owners and managers can choose a photo or upload their own through **Inventory → Edit → Product photo**. See [product photos, updating an existing database, and photography credits](docs/PHOTOS.md).
+
 ShopFlow uses TypeScript, Next.js 16 App Router, React 19, Tailwind CSS 4, Fastify 5, PostgreSQL and Prisma 7.10.1 with the PostgreSQL driver adapter. Dependency versions are recorded in `package-lock.json`. Prisma 7.10.1 is pinned as the stable release; the registry's Prisma 8 tag was a release candidate when this project was created.
 
 ## Start on Windows

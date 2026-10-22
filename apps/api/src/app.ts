@@ -21,6 +21,7 @@ import {
 } from './domain.js';
 import { checkout, purchaseSchema, receivePurchase, refundSale, type Actor } from './trading.js';
 import { invoicePdf, makePdf } from './pdf.js';
+import { photoChoice, preparePhoto } from './photos.js';
 type Identity = Actor & { email: string; name: string; csrf: string };
 declare module 'fastify' {
   interface FastifyRequest {
@@ -36,6 +37,7 @@ const productBody = z
     costMinor: money,
     reorderLevel: z.number().int().min(0).max(1_000_000),
     categoryId: id.nullable().optional(),
+    photo: photoChoice.optional(),
   })
   .strict();
 const dateQuery = z
@@ -85,12 +87,10 @@ export function buildApp(
   app.decorateRequest('identity', null);
   app.setErrorHandler((error, req, reply) => {
     if (error instanceof z.ZodError)
-      return reply
-        .code(400)
-        .send({
-          error: 'Invalid input',
-          details: error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
-        });
+      return reply.code(400).send({
+        error: 'Invalid input',
+        details: error.issues.map((i) => `${i.path.join('.')}: ${i.message}`),
+      });
     if (error instanceof AppError)
       return reply.code(error.statusCode).send({ error: error.message });
     const code = (error as { code?: string }).code;
@@ -423,8 +423,20 @@ export function buildApp(
       pageSize: 50,
     };
   });
-  app.post('/products', { preHandler: allow(manager) }, async (req) => {
-    const data = productBody.parse(req.body);
+  app.get('/products/:id/photo', { preHandler: auth }, async (req, reply) => {
+    const productId = id.parse((req.params as { id: string }).id);
+    const photo = await db.productPhoto.findFirst({
+      where: { productId, businessId: req.identity!.businessId },
+    });
+    if (!photo) throw new AppError(404, 'Photo not found');
+    return reply
+      .type('image/jpeg')
+      .header('X-Content-Type-Options', 'nosniff')
+      .send(Buffer.from(photo.content));
+  });
+  app.post('/products', { preHandler: allow(manager), bodyLimit: 768 * 1024 }, async (req) => {
+    const { photo: choice, ...data } = productBody.parse(req.body);
+    const photo = await preparePhoto(choice);
     const businessId = req.identity!.businessId;
     if (
       data.categoryId &&
@@ -432,7 +444,17 @@ export function buildApp(
     )
       throw new AppError(404, 'Category not found');
     return db.$transaction(async (tx) => {
-      const product = await tx.product.create({ data: { ...data, businessId } });
+      const product = await tx.product.create({
+        data: {
+          ...data,
+          businessId,
+          ...(photo ? { photoKey: photo.photoKey, photoVersion: photo.photoVersion } : {}),
+        },
+      });
+      if (photo?.content)
+        await tx.productPhoto.create({
+          data: { productId: product.id, businessId, content: photo.content },
+        });
       await tx.audit.create({
         data: {
           businessId,
@@ -444,13 +466,14 @@ export function buildApp(
       return product;
     });
   });
-  app.patch('/products/:id', { preHandler: allow(manager) }, async (req) => {
+  app.patch('/products/:id', { preHandler: allow(manager), bodyLimit: 768 * 1024 }, async (req) => {
     const productId = id.parse((req.params as { id: string }).id);
-    const data = productBody
+    const { photo: choice, ...data } = productBody
       .partial()
       .extend({ active: z.boolean().optional() })
       .strict()
       .parse(req.body);
+    const photo = await preparePhoto(choice);
     const businessId = req.identity!.businessId;
     if (
       data.categoryId &&
@@ -458,8 +481,21 @@ export function buildApp(
     )
       throw new AppError(404, 'Category not found');
     return db.$transaction(async (tx) => {
-      const changed = await tx.product.updateMany({ where: { id: productId, businessId }, data });
+      const changed = await tx.product.updateMany({
+        where: { id: productId, businessId },
+        data: {
+          ...data,
+          ...(photo ? { photoKey: photo.photoKey, photoVersion: photo.photoVersion } : {}),
+        },
+      });
       if (!changed.count) throw new AppError(404, 'Product not found');
+      if (photo?.content)
+        await tx.productPhoto.upsert({
+          where: { productId },
+          create: { productId, businessId, content: photo.content },
+          update: { content: photo.content },
+        });
+      else if (photo) await tx.productPhoto.deleteMany({ where: { productId, businessId } });
       await tx.audit.create({
         data: {
           businessId,
@@ -555,8 +591,16 @@ export function buildApp(
           }),
           tx.product.count({ where: { businessId, active: true } }),
           tx.$queryRaw<
-            { id: string; name: string; sku: string; stock: number; reorderLevel: number }[]
-          >`SELECT id, name, sku, stock, "reorderLevel" FROM "Product" WHERE "businessId" = ${businessId} AND active = true AND stock <= "reorderLevel" ORDER BY stock, name LIMIT 20`,
+            {
+              id: string;
+              name: string;
+              sku: string;
+              stock: number;
+              reorderLevel: number;
+              photoKey: string | null;
+              photoVersion: string | null;
+            }[]
+          >`SELECT id, name, sku, stock, "reorderLevel", "photoKey", "photoVersion" FROM "Product" WHERE "businessId" = ${businessId} AND active = true AND stock <= "reorderLevel" ORDER BY stock, name LIMIT 20`,
         ]);
         return {
           today,

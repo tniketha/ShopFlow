@@ -20,7 +20,7 @@ Products, categories, prices, unit costs, stock levels and reorder status.
 
 ### Point of sale
 
-Product selection, a three-item basket, exact LKR totals and cash received. This screenshot shows a basket before confirmation.
+Real product photographs, a two-item basket, exact LKR totals and cash received. This screenshot shows a basket before confirmation.
 
 ![ShopFlow desktop point of sale](03-pos-desktop.jpg)
 
@@ -48,6 +48,12 @@ The default sign-in screen with empty credential fields and generic ShopFlow bra
 
 ![ShopFlow desktop sign-in](07-login-desktop.jpg)
 
+### Product photo editor
+
+Choose a reference photograph or upload an actual product photo. The editor is scrolled to show the photo controls.
+
+![ShopFlow product photo editor](10-photo-editor-desktop.jpg)
+
 ## Mobile
 
 Narrow responsive layouts for the dashboard and product catalogue. Original images are 390 pixels wide.
@@ -63,4 +69,6 @@ Narrow responsive layouts for the dashboard and product catalogue. Original imag
 3. Replace the matching JPEG file, keeping its filename so README links continue to work. Keep credential fields empty in sign-in images.
 4. Inspect each image for layout problems and private information, then copy reviewed images into the separate GitHub clone and commit them.
 
-Project author and owner: **tniketha**. Third-party packages retain their own licenses.
+The dashboard, inventory, checkout and sign-in captures were refreshed with the retail theme and real photography. Photography sources and permissions are listed in [PHOTOS.md](../PHOTOS.md).
+
+Project author and owner: **tniketha**. Third-party packages and photographs retain their own licenses.

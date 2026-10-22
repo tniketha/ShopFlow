@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ProductPhoto, PhotoPicker } from './product-photo';
 import {
   BarChart3,
   Boxes,
@@ -39,6 +40,8 @@ type Product = {
   reorderLevel: number;
   categoryId?: string | null;
   category?: { name: string };
+  photoKey?: string | null;
+  photoVersion?: string | null;
 };
 type Sale = {
   id: string;
@@ -84,6 +87,14 @@ type Report = { columns: string[]; rows: (string | number)[][]; summary: Record<
 type Pending = { path: string; body: Record<string, unknown> };
 const currency = (minor: number) =>
   new Intl.NumberFormat('en-LK', { style: 'currency', currency: 'LKR' }).format(minor / 100);
+const reportLabels: Record<string, string> = {
+  grossMinor: 'Gross sales',
+  refundMinor: 'Refunds',
+  netMinor: 'Net sales',
+  sales: 'Transactions',
+  products: 'Products',
+  valueMinor: 'Stock value',
+};
 const date = (value: string) =>
   new Date(value).toLocaleString('en-GB', {
     timeZone: 'Asia/Colombo',
@@ -113,6 +124,40 @@ const links = [
   ['/team', 'Team', Users],
   ['/audit', 'Activity', ShieldCheck],
 ] as const;
+const sectionCopy: Record<string, { label: string; description: string }> = {
+  overview: {
+    label: 'TODAY AT YOUR STORE',
+    description: 'Sales, stock and the next step for your store.',
+  },
+  inventory: {
+    label: 'PRODUCTS & STOCK',
+    description: 'Your products, prices and stock levels in one place.',
+  },
+  pos: {
+    label: 'THE CHECKOUT COUNTER',
+    description: 'Find a product. Build a basket. Keep your queue moving.',
+  },
+  purchases: {
+    label: 'KEEP THE SHELVES READY',
+    description: 'Receive deliveries and track the stock coming into your store.',
+  },
+  sales: {
+    label: 'SALES & RETURNS',
+    description: 'Find invoices, review purchases and manage customer returns.',
+  },
+  reports: {
+    label: 'YOUR STORE IN NUMBERS',
+    description: 'Understand sales and stock with clear, exportable reports.',
+  },
+  team: {
+    label: 'THE PEOPLE BEHIND YOUR STORE',
+    description: 'Manage your team and the access each person needs.',
+  },
+  audit: {
+    label: 'A RECORD OF EVERY CHANGE',
+    description: 'Review the activity behind your products and transactions.',
+  },
+};
 export default function Workspace() {
   const pathname = usePathname();
   const section = pathname.split('/')[1] || 'overview';
@@ -140,6 +185,7 @@ export default function Workspace() {
   const [receipt, setReceipt] = useState<Sale | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
+  const [photoProcessing, setPhotoProcessing] = useState(false);
   const [refunding, setRefunding] = useState<Sale | null>(null);
   const [purchaseLines, setPurchaseLines] = useState<
     { productId: string; quantity: number; cost: string }[]
@@ -439,7 +485,7 @@ export default function Workspace() {
           <div className="store-avatar">{business.slice(0, 1)}</div>
           <div>
             <strong>{business}</strong>
-            <small>Store workspace</small>
+            <small>Retail workspace</small>
           </div>
           <span className="live-dot" />
         </div>
@@ -498,7 +544,7 @@ export default function Workspace() {
       <div className="main">
         <header className="topbar">
           <span>
-            Workspace <ChevronRight size={14} /> <strong>{title}</strong>
+            Retail workspace <ChevronRight size={14} /> <strong>{title}</strong>
           </span>
           <span className="top-date">
             {new Date().toLocaleDateString('en-GB', {
@@ -514,15 +560,11 @@ export default function Workspace() {
         <main className="content">
           <div className="page-heading">
             <div>
-              <p className="eyebrow">YOUR STORE, IN FOCUS</p>
+              <p className="eyebrow">{sectionCopy[section]?.label ?? 'YOUR STORE WORKSPACE'}</p>
               <h1>
                 {section === 'overview' ? 'Good to see you, ' + me.name.split(' ')[0] + '.' : title}
               </h1>
-              <p>
-                {section === 'overview'
-                  ? 'Here’s how your store is doing today.'
-                  : 'Keep your store moving, one clear step at a time.'}
-              </p>
+              <p>{sectionCopy[section]?.description ?? 'Everything your store needs, together.'}</p>
             </div>
             {section === 'overview' && (
               <Link href="/pos" className="button primary">
@@ -615,8 +657,13 @@ export default function Workspace() {
                       {dashboard.lowStock.map((p) => (
                         <tr key={p.id}>
                           <td>
-                            <strong>{p.name}</strong>
-                            <small>{p.sku}</small>
+                            <div className="product-identity">
+                              <ProductPhoto product={p} />
+                              <div>
+                                <strong>{p.name}</strong>
+                                <small>{p.sku}</small>
+                              </div>
+                            </div>
                           </td>
                           <td>{p.stock}</td>
                           <td>{p.reorderLevel}</td>
@@ -632,9 +679,11 @@ export default function Workspace() {
                   {!dashboard.lowStock.length && <Empty text="Your stock is looking healthy." />}
                 </section>
                 <section className="counter-card">
-                  <div className="counter-icon">
-                    <ShoppingBag size={34} />
-                  </div>
+                  <div
+                    className="counter-photo"
+                    role="img"
+                    aria-label="Fresh vegetables on a shop shelf"
+                  />
                   <p className="eyebrow">READY WHEN YOU ARE</p>
                   <h2>
                     Your next sale
@@ -668,12 +717,22 @@ export default function Workspace() {
           {section === 'pos' && (
             <div className="pos-layout">
               <section className="panel">
+                <div className="catalogue-heading">
+                  <div>
+                    <p className="eyebrow">PRODUCT CATALOGUE</p>
+                    <h2>Ready for the next sale.</h2>
+                  </div>
+                  <span className="badge green">Cash · LKR</span>
+                </div>
                 {productSearch}
                 <div className="product-grid">
                   {products.map((p) => (
                     <button
                       key={p.id}
-                      className="product-card"
+                      className={
+                        'product-card' +
+                        (cart.some((line) => line.product.id === p.id) ? ' in-basket' : '')
+                      }
                       disabled={p.stock === 0 || busy || !!pending}
                       onClick={() =>
                         setCart((current) => {
@@ -688,12 +747,39 @@ export default function Workspace() {
                         })
                       }
                     >
-                      <span className="product-symbol">
-                        <ShoppingBag size={24} />
+                      <ProductPhoto product={p} large />
+                      {cart.some((line) => line.product.id === p.id) && (
+                        <span className="basket-count">
+                          {cart.find((line) => line.product.id === p.id)!.quantity} in basket
+                        </span>
+                      )}
+                      <span className="product-meta">
+                        <span className="product-sku">{p.sku}</span>
+                        <span
+                          className={
+                            'stock-indicator ' +
+                            (p.stock === 0
+                              ? 'sold-out'
+                              : p.stock <= p.reorderLevel
+                                ? 'stock-low'
+                                : '')
+                          }
+                        >
+                          {p.stock === 0
+                            ? 'Sold out'
+                            : p.stock <= p.reorderLevel
+                              ? 'Low stock'
+                              : 'In stock'}
+                        </span>
                       </span>
-                      <span className="muted">{p.sku}</span>
                       <strong>{p.name}</strong>
-                      <span className="product-price">{currency(p.priceMinor)}</span>
+                      <span className="product-category">{p.category?.name ?? 'General'}</span>
+                      <span className="product-card-footer">
+                        <span className="product-price">{currency(p.priceMinor)}</span>
+                        <span className="add-product-icon" aria-hidden="true">
+                          <Plus size={16} />
+                        </span>
+                      </span>
                       <small>{p.stock} available</small>
                     </button>
                   ))}
@@ -709,6 +795,7 @@ export default function Workspace() {
                 </div>
                 {cart.map((l) => (
                   <div className="cart-line" key={l.product.id}>
+                    <ProductPhoto product={l.product} />
                     <div>
                       <strong>{l.product.name}</strong>
                       <small>{currency(l.product.priceMinor)} each</small>
@@ -823,10 +910,19 @@ export default function Workspace() {
                       {products.map((p) => (
                         <tr key={p.id}>
                           <td>
-                            <strong>{p.name}</strong>
-                            <small>{p.sku}</small>
+                            <div className="product-identity">
+                              <ProductPhoto product={p} />
+                              <div>
+                                <strong>{p.name}</strong>
+                                <small>{p.sku}</small>
+                              </div>
+                            </div>
                           </td>
-                          <td>{p.category?.name ?? 'Uncategorized'}</td>
+                          <td>
+                            <span className="category-tag">
+                              {p.category?.name ?? 'Uncategorized'}
+                            </span>
+                          </td>
                           <td>{currency(p.priceMinor)}</td>
                           {managed && <td>{currency(p.costMinor ?? 0)}</td>}
                           <td>{p.stock}</td>
@@ -1232,7 +1328,7 @@ export default function Workspace() {
                     {Object.entries(report.summary).map(([name, value]) => (
                       <Stat
                         key={name}
-                        label={name.replace('Minor', '').replace(/([A-Z])/g, ' $1')}
+                        label={reportLabels[name] ?? name}
                         value={name.endsWith('Minor') ? currency(value) : String(value)}
                         icon={<BarChart3 />}
                         note="Selected report"
@@ -1545,6 +1641,7 @@ export default function Workspace() {
               e.preventDefault();
               const data = new FormData(e.currentTarget);
               action(async () => {
+                if (photoProcessing) throw new Error('Wait for the photo to finish preparing.');
                 const body = {
                   sku: data.get('sku'),
                   name: data.get('name'),
@@ -1552,6 +1649,7 @@ export default function Workspace() {
                   costMinor: minor(String(data.get('cost'))),
                   reorderLevel: Number(data.get('reorderLevel')),
                   categoryId: data.get('categoryId') || null,
+                  ...(data.get('photo') ? { photo: JSON.parse(String(data.get('photo'))) } : {}),
                 };
                 await api(
                   editing === 'new' ? '/products' : '/products/' + editing.id,
@@ -1629,6 +1727,11 @@ export default function Workspace() {
                 required
               />
             </label>
+            <PhotoPicker
+              key={editing === 'new' ? 'new' : editing.id}
+              product={editing === 'new' ? undefined : editing}
+              onProcessing={setPhotoProcessing}
+            />
             <p className="hint">
               New products start with zero stock. Receive a purchase to add inventory.
             </p>
@@ -1649,7 +1752,7 @@ export default function Workspace() {
                   Archive product
                 </button>
               )}
-              <button className="primary" disabled={busy}>
+              <button className="primary" disabled={busy || photoProcessing}>
                 Save product
               </button>
             </div>

@@ -10,6 +10,7 @@ import { createDb, type Db } from '../src/db.js';
 import { buildApp } from '../src/app.js';
 import { checkout, receivePurchase, refundSale, type Actor } from '../src/trading.js';
 import { digest, hashPassword, token } from '../src/domain.js';
+import sharp from 'sharp';
 const origin = 'http://localhost:3000';
 let db: Db;
 let app: ReturnType<typeof buildApp>;
@@ -73,7 +74,7 @@ beforeAll(async () => {
   }
   const pg = new Client({ connectionString: url });
   await pg.connect();
-  for (const name of ['202610210001_initial', '202610210002_checks'])
+  for (const name of ['202610210001_initial', '202610210002_checks', '202610220001_product_photos'])
     await pg.query(
       await readFile(
         new URL(`../prisma/migrations/${name}/migration.sql`, import.meta.url),
@@ -147,6 +148,194 @@ afterAll(async () => {
     await rm(temporaryDirectory, { recursive: true, force: true });
 }, 30000);
 describe('Authentication and permissions', () => {
+  it('saves private photos atomically and serves only the current business', async () => {
+    const image = await sharp({
+      create: { width: 24, height: 24, channels: 3, background: '#708461' },
+    })
+      .png()
+      .toBuffer();
+    const response = await app.inject({
+      method: 'PATCH',
+      url: `/products/${productId}`,
+      headers: ownerHeaders,
+      payload: {
+        photo: { kind: 'upload', data: 'data:image/png;base64,' + image.toString('base64') },
+      },
+    });
+    expect(response.statusCode).toBe(200);
+    const saved = await db.product.findUniqueOrThrow({ where: { id: productId } });
+    expect(saved.photoKey).toBe('custom');
+    expect(saved.photoVersion).toBeTruthy();
+    const photo = await app.inject({
+      method: 'GET',
+      url: `/products/${productId}/photo`,
+      headers: cashierHeaders,
+    });
+    expect(photo.statusCode).toBe(200);
+    expect(photo.headers['content-type']).toContain('image/jpeg');
+    expect(photo.headers['cache-control']).toBe('no-store');
+    expect((await sharp(photo.rawPayload).metadata()).format).toBe('jpeg');
+    expect(
+      (
+        await app.inject({
+          method: 'GET',
+          url: `/products/${productId}/photo`,
+          headers: outsiderHeaders,
+        })
+      ).statusCode,
+    ).toBe(404);
+    expect(
+      (await app.inject({ method: 'GET', url: `/products/${productId}/photo` })).statusCode,
+    ).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: 'PATCH',
+          url: `/products/${productId}`,
+          headers: outsiderHeaders,
+          payload: { photo: { kind: 'library', key: 'rice' } },
+        })
+      ).statusCode,
+    ).toBe(404);
+    expect((await db.product.findUniqueOrThrow({ where: { id: productId } })).photoKey).toBe(
+      'custom',
+    );
+    const reset = await app.inject({
+      method: 'PATCH',
+      url: `/products/${productId}`,
+      headers: ownerHeaders,
+      payload: { photo: { kind: 'library', key: 'tea' } },
+    });
+    expect(reset.statusCode).toBe(200);
+    expect(await db.productPhoto.count()).toBe(0);
+    expect(
+      (await db.product.findUniqueOrThrow({ where: { id: productId } })).photoVersion,
+    ).toBeNull();
+  });
+  it('rejects executable, corrupt, oversized and unapproved photo choices without changing stock or product', async () => {
+    for (const photo of [
+      {
+        kind: 'upload',
+        data: 'data:image/svg+xml;base64,' + Buffer.from('<svg/>').toString('base64'),
+      },
+      {
+        kind: 'upload',
+        data: 'data:image/jpeg;base64,' + Buffer.from('not a real photo').toString('base64'),
+      },
+      { kind: 'library', key: '../../outside' },
+    ]) {
+      const result = await app.inject({
+        method: 'PATCH',
+        url: `/products/${productId}`,
+        headers: ownerHeaders,
+        payload: { name: 'Changed', photo },
+      });
+      expect(result.statusCode).toBe(400);
+    }
+    const huge = await app.inject({
+      method: 'PATCH',
+      url: `/products/${productId}`,
+      headers: ownerHeaders,
+      payload: {
+        photo: {
+          kind: 'upload',
+          data: 'data:image/jpeg;base64,' + Buffer.alloc(524289).toString('base64'),
+        },
+      },
+    });
+    expect(huge.statusCode).toBe(400);
+    const saved = await db.product.findUniqueOrThrow({ where: { id: productId } });
+    expect(saved.name).toBe('Ceylon Tea');
+    expect(saved.stock).toBe(10);
+    expect(saved.photoKey).toBeNull();
+    expect(await db.productPhoto.count()).toBe(0);
+  });
+  it('enforces photo-edit permissions, CSRF and preserves a photo during ordinary edits', async () => {
+    const payload = { photo: { kind: 'library', key: 'tea' } };
+    expect(
+      (
+        await app.inject({
+          method: 'PATCH',
+          url: `/products/${productId}`,
+          headers: cashierHeaders,
+          payload,
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await app.inject({
+          method: 'PATCH',
+          url: `/products/${productId}`,
+          headers: { ...ownerHeaders, 'x-csrf-token': 'wrong' },
+          payload,
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await app.inject({
+          method: 'PATCH',
+          url: `/products/${productId}`,
+          headers: ownerHeaders,
+          payload,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: 'PATCH',
+          url: `/products/${productId}`,
+          headers: ownerHeaders,
+          payload: { name: 'Renamed Tea' },
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect((await db.product.findUniqueOrThrow({ where: { id: productId } })).photoKey).toBe('tea');
+    const list = (
+      await app.inject({ method: 'GET', url: '/products', headers: cashierHeaders })
+    ).json();
+    expect(list.items[0].photoKey).toBe('tea');
+    expect(list.items[0].costMinor).toBeUndefined();
+  });
+  it('creates a product with its photo and supports removing or resetting its reference photo', async () => {
+    const image = await sharp({ create: { width: 8, height: 8, channels: 3, background: 'white' } })
+      .webp()
+      .toBuffer();
+    const created = await app.inject({
+      method: 'POST',
+      url: '/products',
+      headers: ownerHeaders,
+      payload: {
+        sku: 'PHOTO',
+        name: 'Photo product',
+        priceMinor: 100,
+        costMinor: 50,
+        reorderLevel: 2,
+        photo: { kind: 'upload', data: 'data:image/webp;base64,' + image.toString('base64') },
+      },
+    });
+    expect(created.statusCode).toBe(200);
+    const product = created.json();
+    expect(product.photoKey).toBe('custom');
+    for (const kind of ['none', 'automatic']) {
+      expect(
+        (
+          await app.inject({
+            method: 'PATCH',
+            url: `/products/${product.id}`,
+            headers: ownerHeaders,
+            payload: { photo: { kind } },
+          })
+        ).statusCode,
+      ).toBe(200);
+      expect((await db.product.findUniqueOrThrow({ where: { id: product.id } })).photoKey).toBe(
+        kind === 'none' ? 'none' : null,
+      );
+      expect(await db.productPhoto.count()).toBe(0);
+    }
+  });
   it('changes passwords and revokes every session for the account', async () => {
     const second = await session(owner);
     const response = await app.inject({

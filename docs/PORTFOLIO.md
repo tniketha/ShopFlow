@@ -14,7 +14,7 @@ Author and project owner: **tniketha**.
 4. **Reports** — use `screenshots/04-reports-desktop.jpg` for reporting and exports.
 5. **Responsive views** — use the two mobile screenshots to show the narrow layout.
 
-The [complete screenshot gallery](screenshots/README.md) also includes purchasing, sales history and sign-in.
+The [complete screenshot gallery](screenshots/README.md) also includes purchasing, sales history, sign-in and the product photo editor.
 
 ## Technical points to explain
 
@@ -24,7 +24,9 @@ The [complete screenshot gallery](screenshots/README.md) also includes purchasin
 - **Business isolation:** server-derived business identity and composite database foreign keys.
 - **Authentication:** HttpOnly session cookies, hashed session tokens, CSRF protection, session revocation and owner/manager/cashier permissions.
 - **Money:** integer LKR cents with decimal-string parsing and bounds checks.
-- **Verification:** 14 unit tests and 18 real PostgreSQL integration tests, including concurrent operations. GitHub CI verifies Windows and Linux.
+- **Product photography:** bundled real reference photos, optional private photo uploads, image validation, metadata removal and business-scoped access.
+- **Retail design:** forest-green navigation, warm neutral surfaces, photo-led product cards, clear LKR prices and stock status, with responsive desktop and mobile layouts.
+- **Verification:** 14 unit tests and 22 real PostgreSQL integration tests, including concurrent operations and photo isolation. GitHub CI verifies Windows and Linux.
 
 Repository: [github.com/tniketha/ShopFlow](https://github.com/tniketha/ShopFlow).
 
