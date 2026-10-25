@@ -1,0 +1,30 @@
+{
+  "name": "shopflow",
+  "private": true,
+  "version": "1.0.0",
+  "author": "tniketha",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "engines": {
+    "node": ">=22.14.0 <25"
+  },
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c cyan,magenta \"npm run dev -w @shopflow/backend\" \"npm run dev -w @shopflow/frontend\"",
+    "build": "npm run check && npm run build -w @shopflow/frontend",
+    "check": "node scripts/check.mjs",
+    "test": "npm run test -w @shopflow/backend",
+    "test:integration": "npm run test:integration -w @shopflow/backend",
+    "db:migrate": "npm run db:migrate -w @shopflow/backend",
+    "owner:create": "npm run owner:create -w @shopflow/backend",
+    "local:db": "node backend/src/local.js db",
+    "local:setup": "node backend/src/local.js setup",
+    "format": "prettier --write \"**/*.{js,jsx,mjs,json,css,md,yml,yaml}\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "prettier": "^3.6.2"
+  }
+}
