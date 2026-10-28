@@ -18,6 +18,7 @@
     "test": "npm run test -w @shopflow/backend",
     "test:integration": "npm run test:integration -w @shopflow/backend",
     "db:migrate": "npm run db:migrate -w @shopflow/backend",
+    "products:sample": "node --env-file=.env backend/src/seed-products.js",
     "owner:create": "npm run owner:create -w @shopflow/backend",
     "local:db": "node backend/src/local.js db",
     "local:setup": "node backend/src/local.js setup",
